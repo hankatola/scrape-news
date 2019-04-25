@@ -15,7 +15,8 @@
     "cheerio": "^1.0.0-rc.2",
     "express": "^4.16.3",
     "mongoose": "^5.3.16",
-    "morgan": "^1.9.1"
+    "morgan": "^1.9.1",
+    "heroku-postbuild": "npm run build"
   },
   "engines": {
     "npm": "5.7.1",
