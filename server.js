@@ -11,69 +11,109 @@ mongoose.connect(MONGODB_URI)
 
 // Initialize Express
 const app = express()
-
 app.use(logger("dev"))
 app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
 app.use(express.static("public"))
 
-mongoose.connect("mongodb://localhost/scraper", { useNewUrlParser: true })
-
-// Routes
-
-// A GET route for scraping the echoJS website
-app.get("/scrape", (req, res) => {
-  axios.get("http://www.echojs.com/").then(response => {
+// controllers
+const scrapeArticles = (req,res) => {
+  axios.get("https://www.nytimes.com/section/us").then(response => {
     const $ = cheerio.load(response.data)
-    $("article h2").each((i, element) => {
+    const articles = []
+    $("li.css-ye6x8s").each((i, x) => {
       const result = {}
-      result.title = $(element).children("a").text()
-      result.link = $(element).children("a").attr("href")
-      db.Article.create(result)
-        .then(dbArticle => {
-          console.log(dbArticle)
-        })
-        .catch(err => {
-          console.log(err)
-        });
-    });
-    res.send("Scrape Complete")
-  });
-});
+      result.title = $(x).find('h2').text()
+      result.link = "https://www.nytimes.com" + $(x).find('a').attr("href")
+      result.body = $(x).find("p").text()
+      articles.push(result)
+      db.Article.findOne({ link: result.link }).then(a => {
+        if (!a) {
+          db.Article.create(result).then(dbArticle => {
+          }).catch(err => {
+            console.log(err)
+          });
+        } else {
+        }
+      })
+    })
+    db.Article.find({}).sort({_id:-1}).then(dbArticles => {
+      res.json(dbArticles)
+    }).catch(err => {
+      console.log(err)
+    })
+  })
+}
+const saveArticle = (req, res) => {
+  const id = req.params.id
+  db.Article.find({
+    _id: id
+  }).then(article => {
+    db.Article.update(
+      {
+        _id: id
+      },
+      {
+        $set: {
+        saved: !article[0].saved
+        }
+      }
+    ).then(updated => {
+      res.status(200)
+    })
+  }).catch(err => {
+    console.log(err)
+  })
+}
+const getAllArticles = (req, res) => {
+  db.Article.find({}).sort({_id:-1}).then(articles => {
+    res.json(articles)
+  }).catch(err => {
+    res.json(err)
+  })
+}
+const getSavedArticles = (req, res) => {
+  db.Article.find({saved: true}).sort({_id:-1})
+  .then(articles => {
+    res.json(articles)
+  })
+  .catch(err => {
+    res.json(err)
+  })
+}
+const getNote = (req, res) => {
+  db.Note.find(
+    { articleId: req.params.id }
+  ).sort({_id:-1}).then(notes => {
+    console.log(notes)
+    res.json(notes)
+  })
+}
+const makeNote = (req, res) => {
+  db.Note.create({
+    articleId: req.params.id,
+    body: req.body.body
+  }).then(note => {
+    res.json(note)
+  })
+}
+const deleteNote = (req, res) => {
+  db.Note.remove(
+    { _id: req.params.id }
+  ).then(z => {
+    res.status(200)
+  })
+}
+// Routes
+app.get("/articles", getAllArticles)
+app.get("/scrape", scrapeArticles)
+app.get("/savedArticles", getSavedArticles)
+app.post("/saveArticle/:id", saveArticle)
+app.get("/note/:id", getNote)
+app.post("/note/:id", makeNote)
+app.post("/deleteNote/:id", deleteNote)
+// I think we can delete the following function...
 
-app.get("/articles", (req, res) => {
-  db.Article.find({})
-    .then(dbArticle => {
-      res.json(dbArticle)
-    })
-    .catch(err => {
-      res.json(err)
-    });
-});
-
-app.get("/articles/:id", (req, res) => {
-  db.Article.findOne({ _id: req.params.id })
-    .populate("note")
-    .then(dbArticle => {
-      res.json(dbArticle)
-    })
-    .catch(err => {
-      res.json(err)
-    });
-});
-
-app.post("/articles/:id", (req, res) => {
-  db.Note.create(req.body)
-    .then(dbNote => {
-      return db.Article.findOneAndUpdate({ _id: req.params.id }, { note: dbNote._id }, { new: true })
-    })
-    .then(dbArticle => {
-      res.json(dbArticle)
-    })
-    .catch(err => {
-      res.json(err)
-    });
-});
 
 // Start the server
 app.listen(PORT, () => {

@@ -1,72 +1,128 @@
-// Grab the articles as a json
-$.getJSON("/articles", data => {
-  // For each one
-  for (let i = 0; i < data.length; i++) {
-    // Display the apropos information on the page
-    $("#articles").append("<p data-id='" + data[i]._id + "'>" + data[i].title + "<br />" + data[i].link + "</p>");
+$(document).ready(function() {
+
+  // Function Farm
+  let saved = false
+  const drawSingleArticle = article => {
+    return `<div class="card story ${article._id}" data-id="${article._id}" data-title="${article.title}">
+    <h5 class="card-header">${article.title}</h5>
+    <div class="card-body">
+      <p class="card-text">${article.body}</p>
+      <div class="btn btn-primary save-article" data-id="${article._id}" id="${article._id}">${!article.saved && 'Save' || 'Unsave'}</div>
+      <a href='${article.link}' class="btn btn-primary" target="_blank">Read at NYT</a>
+      <button type="button" class="btn btn-primary" data-id="${article._id}">Comment</button>
+    </div>
+  </div>`
   }
-});
-
-
-// Whenever someone clicks a p tag
-$(document).on("click", "p", function() {
-  // Empty the notes from the note section
-  $("#notes").empty();
-  // Save the id from the p tag
-  const thisId = $(this).attr("data-id");
-
-  // Now make an ajax call for the Article
-  $.ajax({
-    method: "GET",
-    url: "/articles/" + thisId
-  })
-    // With that done, add the note information to the page
-    .then(data => {
-      console.log(data);
-      // The title of the article
-      $("#notes").append("<h2>" + data.title + "</h2>");
-      // An input to enter a new title
-      $("#notes").append("<input id='titleinput' name='title' >");
-      // A textarea to add a new note body
-      $("#notes").append("<textarea id='bodyinput' name='body'></textarea>");
-      // A button to submit a new note, with the id of the article saved to it
-      $("#notes").append("<button data-id='" + data._id + "' id='savenote'>Save Note</button>");
-
-      // If there's a note in the article
-      if (data.note) {
-        // Place the title of the note in the title input
-        $("#titleinput").val(data.note.title);
-        // Place the body of the note in the body textarea
-        $("#bodyinput").val(data.note.body);
-      }
-    });
-});
-
-// When you click the savenote button
-$(document).on("click", "#savenote", function() {
-  // Grab the id associated with the article from the submit button
-  const thisId = $(this).attr("data-id");
-
-  // Run a POST request to change the note, using what's entered in the inputs
-  $.ajax({
-    method: "POST",
-    url: "/articles/" + thisId,
-    data: {
-      // Value taken from title input
-      title: $("#titleinput").val(),
-      // Value taken from note textarea
-      body: $("#bodyinput").val()
+  const drawSingleNote = note => {
+    return `<div class="card w-auto p-3" id="${note._id}">
+      <div class="card-body">
+        <p class="card-text">${note.body}</p>
+        <a href="#" class="btn btn-primary delete-button" data-id="${note._id}">Delete</a>
+      </div>
+    </div>`
+  }
+  const queryAndDrawArticles  = (all=true) => {
+    // draw article function
+    // prepare & draw
+    $("#articles").empty()
+    const home = $('#home-button')
+    const save = $('#save-button')
+    const borders = 'border border-light'
+    if (!saved) {
+      home.addClass(borders)
+      save.removeClass(borders)
+    } else {
+      home.removeClass(borders)
+      save.addClass(borders)
     }
-  })
-    // With that done
-    .then(data => {
-      // Log the response
-      console.log(data);
-      // Empty the notes section
-      $("#notes").empty();
+    $.getJSON(`/${all && 'articles' || 'savedArticles'}`, articles => {
+      for (let i in articles) {
+        $("#articles").append(drawSingleArticle(articles[i]))
+      }
+    })
+  }
+  const allArticles = () => {
+    saved = false
+    queryAndDrawArticles()
+  }
+  const savedArticles = () => {
+    saved = true
+    queryAndDrawArticles(false)
+  }
+  function saveArticle() {
+    const id = $(this).attr("data-id")
+    const btn = $(`#${id}`)
+    if (btn.text() === 'Save') {
+      btn.text('Unsave')
+    } else {
+      btn.text('Save')
+    }
+    // if we're viewing saved articles remove the article after it's unsaved
+    saved && $(`.${id}`).remove()
+    $.ajax({
+      method: "POST",
+      url: "/saveArticle/" + id,
+    }).then(res => {
     });
+  }
+  const scrapeArticles = () => {
+    $("#articles").empty()
+    $.getJSON('/scrape', articles => {
+      for (let i in articles){
+        $('#articles').append(drawSingleArticle(articles[i]))
+      }
+    })
+  }
+  function drawNotes() {
+    // draw note function
+    // prepare & draw
+    const id = $(this).attr('data-id')
+    $('#comment-title').attr('data-id',id).text($(this).attr('data-title'))
+    $('#notes').empty()
+    $.ajax({
+      method: "GET",
+      url: `/note/${id}`,
+    }).then(notes => {
+      for (let i in notes) {
+        $('#notes').append(drawSingleNote(notes[i]))
+      }
+    })
+  }
+  const saveNote = () => {
+    const note = $('#comment-text').val()
+    const id = $('#comment-title').attr('data-id')
+    $.ajax({
+      method: "POST",
+      url: `/note/${id}`,
+      data: {
+        body: note
+      }
+    }).then(res => {
+      $('#notes').prepend(drawSingleNote(res))
+    })
+  }
+  function deleteNote() {
+    const id = $(this).attr('data-id')
+    $(`#${id}`).remove()
+    $.ajax({
+      method: "POST",
+      url: `/deleteNote/${id}`,
+    }).then(res => {
+    })
+  }
+  /*TODO: Highlight the 'Home' button when on 'home', and the 'saved' when on saved,
+          but use the same page for both, just empty the article section & redraw w/
+          saved articles when showing them. All should be on one page.
+  */
 
-  // Also, remove the values entered in the input and textarea for note entry
-  $("#titleinput").val("");
-  $("#bodyinput").val("");
-});
+  // On Clicks
+  $(document).on("click", ".story", drawNotes)
+  $(document).on("click", ".save-note", saveNote)
+  $(document).on("click", ".save-article", saveArticle)
+  $(document).on("click", ".get-articles", allArticles)
+  $(document).on("click", ".delete-button", deleteNote)
+  $(document).on("click", ".get-saved", savedArticles)
+  $(document).on("click", ".scrape", scrapeArticles)
+
+  allArticles()
+})
