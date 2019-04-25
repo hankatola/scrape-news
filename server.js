@@ -27,6 +27,10 @@ const scrapeArticles = (req,res) => {
       result.link = "https://www.nytimes.com" + $(x).find('a').attr("href")
       result.body = $(x).find("p").text()
       articles.push(result)
+    //   db.Article.create(result).then(articles => {
+    //     res.json(articles)
+    //   })
+    // })
       db.Article.findOne({ link: result.link }).then(a => {
         if (!a) {
           db.Article.create(result).then(dbArticle => {
