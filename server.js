@@ -109,14 +109,15 @@ const deleteNote = (req, res) => {
   })
 }
 // Routes
-app.get("/articles", getAllArticles)
-app.get("/scrape", scrapeArticles)
-app.get("/savedArticles", getSavedArticles)
-app.post("/saveArticle/:id", saveArticle)
-app.get("/note/:id", getNote)
-app.post("/note/:id", makeNote)
-app.post("/deleteNote/:id", deleteNote)
-// I think we can delete the following function...
+const router = require('express').Router()
+app.use(router)
+router.get("/articles", getAllArticles)
+router.get("/scrape", scrapeArticles)
+router.get("/savedArticles", getSavedArticles)
+router.post("/saveArticle/:id", saveArticle)
+router.get("/note/:id", getNote)
+router.post("/note/:id", makeNote)
+router.post("/deleteNote/:id", deleteNote)
 
 
 // Start the server
